@@ -52,12 +52,12 @@ if st.button("🚀 Run & Update Diagram"):
     c4 = Connection(fp, 'out1', sg, 'in1', label='4')
     c0 = Connection(sg, 'out1', cc, 'in1', label='0')
     
-    my_plant.add_conns(c1, c2, c3, c4, c0)
+    nw.add_conns(c1, c2, c3, c4, c0)
     
     c11 = Connection(cwso, 'out1', mc, 'in2', label='11')
     c12 = Connection(mc, 'out2', cwsi, 'in1', label='12')
     
-    my_plant.add_conns(c11, c12)
+    nw.add_conns(c11, c12)
     
     # 파라미터 적용
     mc.set_attr(pr1=1, pr2=0.98)
