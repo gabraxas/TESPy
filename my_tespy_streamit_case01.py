@@ -106,7 +106,7 @@ if st.button("🚀 Run & Update Diagram"):
             
             # 등고선 추가
             for key, data in result_dict.items():
-            result_dict[key]['datapoints'] = diagram.calc_individual_isoline(**data)
+                result_dict[key]['datapoints'] = diagram.calc_individual_isoline(**data)
 
             diagram.set_isolines(**isolines)
             diagram.calc_isolines()
