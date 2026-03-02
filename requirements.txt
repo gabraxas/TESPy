@@ -1,4 +1,7 @@
-tespy
 streamlit
-plotly
+tespy
+fluprodia
+CoolProp
+matplotlib
+numpy
 pandas
