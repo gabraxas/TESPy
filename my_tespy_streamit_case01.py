@@ -88,7 +88,7 @@ if st.button("🚀 Run & Update Diagram"):
 
         with col_metrics:
             st.subheader("Performance Metrics")
-            net_power = (tur.P.val + pu.P.val) / 1e6
+            net_power = (tu.P.val + fp.P.val) / 1e6
             efficiency = abs(net_power / (sg.Q.val / 1e6)) * 100
             st.metric("Thermal Efficiency", f"{efficiency:.2f} %")
             st.metric("Net Power Output", f"{net_power:.2f} MW")
@@ -120,15 +120,3 @@ if st.button("🚀 Run & Update Diagram"):
     except Exception as e:
         st.error(f"계산 에러가 발생했습니다: {e}")
 
-# 3
-#import urllib
-#print("Password/Enpoint IP for localtunnel is:",urllib.request.urlopen('https://ipv4.icanhazip.com').read().decode('utf8').strip("\n"))
-
-# "Password/Enpoint IP for localtunnel is:" 우측에 xx.xxx.xx.xxx 혹은 xx.xxx.xxx.xxx 형식의 숫자가 나온다.
-
-#!npm install localtunnel
-
-#!npm audit fix --force
-
-# 1. 터널링을 통해 URL 생성 (나오는 IP 주소를 복사)
-# !streamlit run app.py & npx localtunnel --port 8501
