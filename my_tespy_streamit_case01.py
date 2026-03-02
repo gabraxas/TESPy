@@ -11,7 +11,8 @@ Original file is located at
 #pip install fluprodia
 
 #pip install streamlit -q
-
+import numpy as np
+import matplotlib.pyplot as plt
 import streamlit as st
 from tespy.networks import Network
 from tespy.components import Sink, Source, Turbine, Condenser, Pump, SimpleHeatExchanger
