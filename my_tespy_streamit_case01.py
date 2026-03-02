@@ -112,4 +112,4 @@ if st.button("🚀 Run & Update Diagram"):
 #!npm audit fix --force
 
 # 1. 터널링을 통해 URL 생성 (나오는 IP 주소를 복사)
-!streamlit run app.py & npx localtunnel --port 8501
+# !streamlit run app.py & npx localtunnel --port 8501
