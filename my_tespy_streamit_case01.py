@@ -7,11 +7,10 @@ Original file is located at
     https://colab.research.google.com/drive/1R3O6WXNwcv4gxAr9ZYqPFHIxzBUSqgy0
 """
 
-!pip install tespy
-!pip install fluprodia
+pip install tespy
+pip install fluprodia
 
-!pip install streamlit -q
-!npm install localtunnel
+pip install streamlit -q
 
 import streamlit as st
 from tespy.networks import Network
