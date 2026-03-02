@@ -19,6 +19,8 @@ from tespy.connections import Connection
 import pandas as pd
 import plotly.graph_objects as go
 
+nw = Network()
+
 # 1. 페이지 설정
 st.set_page_config(page_title="Rankine Cycle T-s Designer", layout="wide")
 st.title("♨️ Rankine Cycle & T-s Diagram Visualizer")
