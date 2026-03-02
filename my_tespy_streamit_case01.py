@@ -77,7 +77,10 @@ if st.button("🚀 Run & Update Diagram"):
 
     try:
         nw.solve(mode='design')
-
+        # --- fluprodia를 이용한 T-s 선도 생성 파트 ---
+        diagram = FluidPropertyDiagram('water')
+        diagram.set_unit_system(T='°C', p='bar', h='kJ/kg')
+        
         # 결과 데이터 추출
         res = nw.results['Connection']
         # T-s 선도를 위한 데이터 정렬 (1->2->3->4->1 순서)
@@ -100,7 +103,19 @@ if st.button("🚀 Run & Update Diagram"):
         with col_chart:
             st.subheader("T-s Diagram")
             fig = go.Figure()
+            
+            # 등고선 추가
+            for key, data in result_dict.items():
+            result_dict[key]['datapoints'] = diagram.calc_individual_isoline(**data)
 
+            diagram.set_isolines(**isolines)
+            diagram.calc_isolines()
+        
+            # T-s 배경 그리기 (x_max는 J/kgK 단위이므로 주의)
+            diagram.draw_isolines(fig, ax, 'Ts', x_min=0, x_max=9000, y_min=0, y_max=650)
+
+
+            
             # 사이클 라인 추가
             fig.add_trace(go.Scatter(
                 x=s_data, y=t_data,
