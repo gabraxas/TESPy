@@ -105,6 +105,7 @@ if st.button("🚀 Run & Update Diagram"):
             fig = go.Figure()
             
             # 등고선 추가
+            result_dict={}
             for key, data in result_dict.items():
                 result_dict[key]['datapoints'] = diagram.calc_individual_isoline(**data)
 
