@@ -88,7 +88,7 @@ if st.button("🚀 Run & Update Diagram"):
 
         with col_metrics:
             st.subheader("Performance Metrics")
-            net_power = (tur.P.val + pu.P.val) / 1e6
+            net_power = (tu.P.val + fp.P.val) / 1e6
             efficiency = abs(net_power / (sg.Q.val / 1e6)) * 100
             st.metric("Thermal Efficiency", f"{efficiency:.2f} %")
             st.metric("Net Power Output", f"{net_power:.2f} MW")
