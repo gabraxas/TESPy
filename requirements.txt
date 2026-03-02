@@ -1,0 +1,4 @@
+tespy
+streamlit
+plotly
+pandas
