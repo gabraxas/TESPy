@@ -18,7 +18,7 @@ from tespy.components import Sink, Source, Turbine, Condenser, Pump, SimpleHeatE
 from tespy.connections import Connection
 import pandas as pd
 import plotly.graph_objects as go
-import CoolProp.CoolProp import PropsSI
+from CoolProp.CoolProp import PropsSI
 from fluprodia import FluidPropertyDiagram
 
 nw = Network()
