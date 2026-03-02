@@ -32,27 +32,43 @@ eta_s_t = st.sidebar.slider("Turbine Isentropic Efficiency", 0.5, 1.0, 0.85)
 
 if st.button("🚀 Run & Update Diagram"):
     # 3. TESPy 네트워크 모델링
-    nw = Network(fluids=['water'], T_unit='C', p_unit='bar', h_unit='kJ / kg', s_unit='kJ / kgK')
-
-    # SteamGenerator 대신 SimpleHeatExchanger 사용
-    sg = SimpleHeatExchanger('Boiler')
-    tur = Turbine('Turbine')
-    con = Condenser('Condenser')
-    pu = Pump('Pump')
-
-    c1 = Connection(sg, 'out1', tur, 'in1', label='1')
-    c2 = Connection(tur, 'out1', con, 'in1', label='2')
-    c3 = Connection(con, 'out1', pu, 'in1', label='3')
-    c4 = Connection(pu, 'out1', sg, 'in1', label='4')
-
-    nw.add_conns(c1, c2, c3, c4)
-
+    from tespy.components import (
+    CycleCloser, Pump, Condenser, Turbine, SimpleHeatExchanger, Source, Sink)
+    
+    cc = CycleCloser('cycle closer')
+    sg = SimpleHeatExchanger('steam generator')
+    mc = Condenser('main condenser')
+    tu = Turbine('steam turbine')
+    fp = Pump('feed pump')
+    
+    cwso = Source('cooling water source')
+    cwsi = Sink('cooling water sink')
+    
+    from tespy.connections import Connection
+    
+    c1 = Connection(cc, 'out1', tu, 'in1', label='1')
+    c2 = Connection(tu, 'out1', mc, 'in1', label='2')
+    c3 = Connection(mc, 'out1', fp, 'in1', label='3')
+    c4 = Connection(fp, 'out1', sg, 'in1', label='4')
+    c0 = Connection(sg, 'out1', cc, 'in1', label='0')
+    
+    my_plant.add_conns(c1, c2, c3, c4, c0)
+    
+    c11 = Connection(cwso, 'out1', mc, 'in2', label='11')
+    c12 = Connection(mc, 'out2', cwsi, 'in1', label='12')
+    
+    my_plant.add_conns(c11, c12)
+    
     # 파라미터 적용
-    c1.set_attr(p=p_live, T=t_live, m=10)
+    mc.set_attr(pr1=1, pr2=0.98)
+    sg.set_attr(pr=0.9)
+    tu.set_attr(eta_s=0.9)
+    fp.set_attr(eta_s=0.75)
+    
+    c11.set_attr(T=20, p=1.2, fluid={'water': 1})
+    c12.set_attr(T=30)
+    c1.set_attr(T=t_live, p=p_live, m=10, fluid={'water': 1})
     c2.set_attr(p=p_cond)
-    tur.set_attr(eta_s=eta_s_t)
-    pu.set_attr(eta_s=0.8)
-    sg.set_attr(pr=1.0) # 보일러(열교환기) 압력 강하 없음으로 설정
 
     try:
         nw.solve(mode='design')
