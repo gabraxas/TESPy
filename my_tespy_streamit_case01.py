@@ -80,7 +80,11 @@ if st.button("🚀 Run & Update Diagram"):
         # --- fluprodia를 이용한 T-s 선도 생성 파트 ---
         diagram = FluidPropertyDiagram('water')
         diagram.set_unit_system(T='°C', p='bar', h='kJ/kg')
-        
+        isolines = {
+            'Q': np.linspace(0, 1, 11), # 등건도선 추가
+            'p': np.array([1, 5, 10, 50, 100, 150]),
+            'h': np.arange(500, 4001, 500)
+        }
         # 결과 데이터 추출
         res = nw.results['Connection']
         # T-s 선도를 위한 데이터 정렬 (1->2->3->4->1 순서)
