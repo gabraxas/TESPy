@@ -5,3 +5,4 @@ CoolProp
 matplotlib
 numpy
 pandas
+streamlit-drawable-canvas
