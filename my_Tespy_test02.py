@@ -78,46 +78,55 @@ with col_canvas:
 with col_result:
     st.subheader("🚀 시뮬레이션 결과")
     if st.button("TESPy 해석 실행", use_container_width=True):
-        try:
-            nw = Network(fluids=['water'], T_unit='C', p_unit='bar')
-            
-            # 컴포넌트 객체 생성
-            comps = {}
-            for name in st.session_state.comp_params.keys():
-                if "Source" in name: comps[name] = Source(name)
-                elif "Sink" in name: comps[name] = Sink(name)
-                elif "HeatExchanger" in name: comps[name] = HeatExchanger(name)
-                elif "Pump" in name: comps[name] = Pump(name)
+    try:
+        nw = Network(fluids=['water'], T_unit='C', p_unit='bar')
+        
+        # 1. 컴포넌트 생성 (기존과 동일)
+        comps = {}
+        for name in st.session_state.comp_params.keys():
+            if "Source" in name: comps[name] = Source(name)
+            elif "Sink" in name: comps[name] = Sink(name)
+            elif "HeatExchanger" in name: comps[name] = HeatExchanger(name)
+            elif "Pump" in name: comps[name] = Pump(name)
 
-            # 연결 및 입력값 반영
-            tespy_conns = []
-            for conn in st.session_state.connections:
-                c = Connection(comps[conn['source']], conn['s_port'], 
-                               comps[conn['target']], conn['t_port'])
-                
-                # Source 데이터 반영
-                if isinstance(comps[conn['source']], Source):
-                    p = st.session_state.comp_params[conn['source']]
-                    c.set_attr(fluid={'water': 1}, T=p.get('T', 20), p=p.get('p', 1), m=p.get('m', 2))
-                
-                tespy_conns.append(c)
+        # 2. 커넥션 및 '모든' Source 조건 할당
+        tespy_conns = []
+        for conn in st.session_state.connections:
+            c = Connection(comps[conn['source']], conn['s_port'], 
+                           comps[conn['target']], conn['t_port'])
             
-            nw.add_conns(*tespy_conns)
-            
-            # 컴포넌트 특성값 반영
-            for name, obj in comps.items():
-                p = st.session_state.comp_params[name]
-                if isinstance(obj, HeatExchanger):
-                    obj.set_attr(pr1=p.get('pr1', 0.98), pr2=p.get('pr2', 0.98))
-                elif isinstance(obj, Pump):
-                    obj.set_attr(eta_s=p.get('eta_s', 0.8))
+            # 중요: 모든 Source에서 나가는 커넥션에 기본값이라도 할당
+            if isinstance(comps[conn['source']], Source):
+                p = st.session_state.comp_params.get(conn['source'], {})
+                # 유입 조건이 누락되지 않도록 기본값(default) 설정
+                c.set_attr(
+                    fluid={'water': 1}, 
+                    T=p.get('T', 20.0), 
+                    p=p.get('p', 1.0), 
+                    m=p.get('m', 1.0)
+                )
+            tespy_conns.append(c)
+        
+        nw.add_conns(*tespy_conns)
+        
+        # 3. 컴포넌트 파라미터 강제 할당
+        for name, obj in comps.items():
+            p = st.session_state.comp_params.get(name, {})
+            if isinstance(obj, HeatExchanger):
+                # HX는 pr1, pr2가 없으면 에러가 날 확률이 높음
+                obj.set_attr(pr1=p.get('pr1', 0.98), pr2=p.get('pr2', 0.98))
+            elif isinstance(obj, Pump):
+                # 펌프도 효율이나 전력 중 하나는 명시되어야 함
+                obj.set_attr(eta_s=p.get('eta_s', 0.8))
 
+        # 해석 전 체크: 커넥션 수가 너무 적으면 에러 메시지 출력
+        if len(tespy_conns) < 2:
+            st.error("네트워크가 너무 단순합니다. 최소 2개 이상의 연결이 필요합니다.")
+        else:
             nw.solve(mode='design')
             st.success("해석 성공!")
-            
-            # 결과 테이블
-            res_df = nw.results['Connection'][['m', 'p', 'T', 'h']]
-            st.dataframe(res_df)
-            
-        except Exception as e:
-            st.error(f"오류 발생: {e}")
+            st.dataframe(nw.results['Connection'])
+
+    except Exception as e:
+        st.error(f"TESPy Solver 오류: {e}")
+        st.info("💡 힌트: 모든 Source에 온도(T), 압력(p), 유량(m)이 입력되었는지 확인하세요.")
