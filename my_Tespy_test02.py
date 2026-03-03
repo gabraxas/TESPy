@@ -1,46 +1,87 @@
 import streamlit as st
-from streamlit_drawable_canvas import st_canvas
+from streamlit_react_flow import react_flow
 from tespy.networks import Network
-from tespy.components import Source, Sink, HeatExchanger, Pump
+from tespy.components import Source, Sink, Pump, HeatExchanger
 from tespy.connections import Connection
+import pandas as pd
 
-st.title("🎨 Draw your Thermal Network")
+st.set_page_config(layout="wide")
+st.title("🔗 React-flow 기반 열유체 네트워크 설계기")
 
-# 1. 사이드바에서 컴포넌트 타입 선택
-comp_type = st.sidebar.selectbox("Select Component to Draw", ["Source", "Sink", "Pump", "HeatExchanger"])
-drawing_mode = st.sidebar.selectbox("Drawing tool:", ("rect", "line")) # rect는 컴포넌트, line은 커넥션
+# 1. 노드 및 에지(연결선) 초기 설정
+# 각 노드의 'data' 필드에 TESPy 컴포넌트 타입을 지정합니다.
+initial_nodes = [
+    {"id": "source_1", "type": "input", "data": {"label": "Source (Inlet)", "comp_type": "source"}, "position": {"x": 50, "y": 50}},
+    {"id": "pump_1", "data": {"label": "Pump", "comp_type": "pump"}, "position": {"x": 250, "y": 50}},
+    {"id": "sink_1", "type": "output", "data": {"label": "Sink (Outlet)", "comp_type": "sink"}, "position": {"x": 450, "y": 50}},
+]
+initial_edges = []
 
-# 2. 캔버스 설정
-canvas_result = st_canvas(
-    fill_color="rgba(255, 165, 0, 0.3)",  # 도형 내부 색상
-    stroke_width=3,
-    stroke_color="#000",
-    background_color="#eee",
-    height=400,
-    drawing_mode=drawing_mode,
-    key="canvas",
-)
+# 2. React-flow 인터페이스 레이아웃
+col_canvas, col_settings = st.columns([3, 1])
 
-# 3. 캔버스 데이터를 TESPy 네트워크로 변환하는 로직
-if st.button("Build & Solve Network"):
-    if canvas_result.json_data is not None:
-        objects = canvas_result.json_data["objects"]
+with col_canvas:
+    st.subheader("Network Canvas (Drag to Connect)")
+    # 사용자가 웹에서 노드를 움직이거나 선을 연결하면 elements가 업데이트됩니다.
+    elements = react_flow("tespy_flow", nodes=initial_nodes, edges=initial_edges, interactive=True)
+
+with col_settings:
+    st.subheader("Parameters")
+    fluid = st.selectbox("Fluid", ["water", "air"])
+    p_in = st.number_input("Inlet Pressure (bar)", value=1.0)
+    t_in = st.number_input("Inlet Temp (°C)", value=20.0)
+    mass_flow = st.number_input("Mass Flow (kg/s)", value=2.0)
+    run_button = st.button("🚀 Run TESPy Solve")
+
+# 3. React-flow 데이터를 TESPy 모델로 변환하는 핵심 로직
+def build_tespy_from_flow(flow_data):
+    nw = Network(fluids=[fluid], T_unit='C', p_unit='bar', h_unit='kJ / kg')
+    
+    # 노드 ID를 키로, TESPy 객체를 값으로 하는 딕셔너리
+    comps = {}
+    
+    # A. 노드 생성
+    for node in flow_data['nodes']:
+        n_id = node['id']
+        c_type = node['data']['comp_type']
         
-        # 실제 구현 시에는 각 도형의 ID와 좌표를 저장하여 TESPy 객체와 매핑합니다.
-        # 여기서는 개념 증명을 위해 감지된 객체의 개수를 출력합니다.
-        components_found = [obj for obj in objects if obj["type"] == "rect"]
-        connections_found = [obj for obj in objects if obj["type"] == "line"]
-        
-        st.write(f"Detected {len(components_found)} Components and {len(connections_found)} Connections.")
+        if c_type == "source": comps[n_id] = Source(n_id)
+        elif c_type == "sink": comps[n_id] = Sink(n_id)
+        elif c_type == "pump": comps[n_id] = Pump(n_id)
+        elif c_type == "heat_exchanger": comps[n_id] = HeatExchanger(n_id)
 
-        # 시뮬레이션 엔진 가동 (예시)
-        try:
-            nw = Network(fluids=['water'], T_unit='C', p_unit='bar')
+    # B. 에지(연결선) 생성 및 TESPy Connection 설정
+    conns = []
+    for edge in flow_data['edges']:
+        source_id = edge['source']
+        target_id = edge['target']
+        
+        # 실제 TESPy 객체 연결
+        c = Connection(comps[source_id], 'out1', comps[target_id], 'in1')
+        
+        # 첫 번째 연결선(Source 출발)에 경계 조건 부여
+        if comps[source_id].__class__.__name__ == 'Source':
+            c.set_attr(fluid={fluid: 1}, m=mass_flow, p=p_in, T=t_in)
+        
+        conns.append(c)
+    
+    nw.add_conns(*conns)
+    
+    # 펌프 등 개별 컴포넌트 기본 특성 부여 (예시)
+    for c in comps.values():
+        if isinstance(c, Pump):
+            c.set_attr(eta_s=0.8, P=1000) # 기본값 설정
             
-            # (심화 로직 필요) objects의 좌표를 분석하여 
-            # 선(line)의 시작점과 끝점에 있는 사각형(rect)을 찾아 
-            # Connection(comp1, 'out1', comp2, 'in1')을 자동으로 생성합니다.
-            
-            st.success("네트워크 구조가 성공적으로 인식되었습니다! (상세 매핑 로직 구현 필요)")
-        except Exception as e:
-            st.error(f"Error: {e}")
+    return nw
+
+# 4. 실행 결과 출력
+if run_button and elements:
+    try:
+        nw_model = build_tespy_from_flow(elements)
+        nw_model.solve(mode='design')
+        
+        st.divider()
+        st.success("해석 완료!")
+        st.dataframe(nw_model.results['Connection'])
+    except Exception as e:
+        st.error(f"해석 중 오류 발생: {e}")
