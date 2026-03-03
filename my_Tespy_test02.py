@@ -5,93 +5,119 @@ from tespy.connections import Connection
 import graphviz
 import pandas as pd
 
-st.set_page_config(layout="wide", page_title="TESPy Designer")
-st.title("🌡️ TESPy 시각적 네트워크 설계기")
+st.set_page_config(layout="wide", page_title="TESPy Pro Designer")
+st.title("🌡️ TESPy 파라미터 제어 시뮬레이터")
 
-# 1. 세션 상태에 네트워크 데이터 저장
+# --- 1. 세션 상태 초기화 ---
 if "connections" not in st.session_state:
-    st.session_state.connections = [] # [{'source': 'src1', 'target': 'hx1', 's_port': 'out1', 't_port': 'in1'}]
+    st.session_state.connections = []
+if "comp_params" not in st.session_state:
+    st.session_state.comp_params = {} # { 'Source_Hot': {'T': 80, 'p': 1, 'm': 2}, ... }
 
-# 2. 레이아웃 분할
-col_input, col_canvas = st.columns([1, 2])
+# --- 2. 사이드바: 네트워크 구성 및 수치 입력 ---
+with st.sidebar:
+    st.header("🛠️ 설계 및 파라미터")
+    
+    # A. 연결 관리 탭
+    tab1, tab2 = st.tabs(["연결 추가", "수치 입력"])
+    
+    with tab1:
+        comp_options = ["Source_Hot", "Source_Cold", "HeatExchanger", "Pump", "Sink_Hot", "Sink_Cold"]
+        src = st.selectbox("출발 (Source)", comp_options)
+        trg = st.selectbox("도착 (Target)", comp_options)
+        
+        c1, c2 = st.columns(2)
+        s_port = c1.selectbox("출구 포트", ["out1", "out2"], key="sp")
+        t_port = c2.selectbox("입구 포트", ["in1", "in2"], key="tp")
+        
+        if st.button("연결 추가 (+)", use_container_width=True):
+            st.session_state.connections.append({
+                "source": src, "target": trg, "s_port": s_port, "t_port": t_port
+            })
+            # 컴포넌트 파라미터 초기화 (없을 경우만)
+            if src not in st.session_state.comp_params: st.session_state.comp_params[src] = {}
+            if trg not in st.session_state.comp_params: st.session_state.comp_params[trg] = {}
 
-with col_input:
-    st.header("🔗 연결 추가")
-    comp_list = ["Source_Hot", "Source_Cold", "HeatExchanger", "Pump", "Sink_Hot", "Sink_Cold"]
-    
-    src = st.selectbox("출발 컴포넌트 (Source)", comp_list)
-    trg = st.selectbox("도착 컴포넌트 (Target)", comp_list)
-    
-    # 열교환기용 포트 선택 (다중 포트 대응)
-    col_p1, col_p2 = st.columns(2)
-    with col_p1:
-        s_port = st.selectbox("출구 포트", ["out1", "out2"])
-    with col_p2:
-        t_port = st.selectbox("입구 포트", ["in1", "in2"])
+        if st.button("전체 초기화", type="primary"):
+            st.session_state.connections = []
+            st.session_state.comp_params = {}
+            st.rerun()
 
-    if st.button("연결 추가 (+)", use_container_width=True):
-        st.session_state.connections.append({
-            "source": src, "target": trg, "s_port": s_port, "t_port": t_port
-        })
-    
-    if st.button("초기화 (Reset)", type="primary"):
-        st.session_state.connections = []
-        st.rerun()
+    with tab2:
+        if not st.session_state.comp_params:
+            st.info("먼저 연결을 추가하세요.")
+        else:
+            selected_comp = st.selectbox("수정할 컴포넌트", list(st.session_state.comp_params.keys()))
+            st.subheader(f"📍 {selected_comp} 설정")
+            
+            # 컴포넌트 종류별 동적 입력창
+            if "Source" in selected_comp:
+                st.session_state.comp_params[selected_comp]['T'] = st.number_input("온도 (°C)", value=80.0 if "Hot" in selected_comp else 20.0)
+                st.session_state.comp_params[selected_comp]['p'] = st.number_input("압력 (bar)", value=1.0)
+                st.session_state.comp_params[selected_comp]['m'] = st.number_input("유량 (kg/s)", value=2.0)
+            
+            elif "Pump" in selected_comp:
+                st.session_state.comp_params[selected_comp]['eta_s'] = st.slider("등엔트로피 효율", 0.1, 1.0, 0.8)
+                st.session_state.comp_params[selected_comp]['P'] = st.number_input("소비 전력 (W)", value=1000)
+            
+            elif "HeatExchanger" in selected_comp:
+                st.session_state.comp_params[selected_comp]['pr1'] = st.slider("압력비 1 (Hot)", 0.8, 1.0, 0.98)
+                st.session_state.comp_params[selected_comp]['pr2'] = st.slider("압력비 2 (Cold)", 0.8, 1.0, 0.98)
+
+# --- 3. 메인 화면: 구조도 및 결과 ---
+col_canvas, col_result = st.columns([1, 1])
 
 with col_canvas:
-    st.header("🖼️ 네트워크 구조도")
-    # Graphviz를 이용한 시각화
+    st.subheader("🖼️ 네트워크 구조도")
     dot = graphviz.Digraph()
-    dot.attr(rankdir='LR') # 왼쪽에서 오른쪽으로 흐름
-    
+    dot.attr(rankdir='LR')
     for conn in st.session_state.connections:
-        label = f"{conn['s_port']} → {conn['t_port']}"
-        dot.edge(conn['source'], conn['target'], label=label)
-    
+        dot.edge(conn['source'], conn['target'], label=f"{conn['s_port']}→{conn['t_port']}")
     st.graphviz_chart(dot)
 
-# 3. TESPy 시뮬레이션 섹션
-st.divider()
-if st.button("🚀 TESPy 해석 실행", use_container_width=True):
-    if not st.session_state.connections:
-        st.warning("먼저 컴포넌트를 연결해 주세요.")
-    else:
+with col_result:
+    st.subheader("🚀 시뮬레이션 결과")
+    if st.button("TESPy 해석 실행", use_container_width=True):
         try:
             nw = Network(fluids=['water'], T_unit='C', p_unit='bar')
             
-            # 컴포넌트 객체 생성 자동화
+            # 컴포넌트 객체 생성
             comps = {}
-            for conn in st.session_state.connections:
-                for name in [conn['source'], conn['target']]:
-                    if name not in comps:
-                        if "Source" in name: comps[name] = Source(name)
-                        elif "Sink" in name: comps[name] = Sink(name)
-                        elif "HeatExchanger" in name: comps[name] = HeatExchanger(name)
-                        elif "Pump" in name: comps[name] = Pump(name)
+            for name in st.session_state.comp_params.keys():
+                if "Source" in name: comps[name] = Source(name)
+                elif "Sink" in name: comps[name] = Sink(name)
+                elif "HeatExchanger" in name: comps[name] = HeatExchanger(name)
+                elif "Pump" in name: comps[name] = Pump(name)
 
-            # 커넥션 객체 생성
+            # 연결 및 입력값 반영
             tespy_conns = []
             for conn in st.session_state.connections:
                 c = Connection(comps[conn['source']], conn['s_port'], 
                                comps[conn['target']], conn['t_port'])
                 
-                # 기본 경계 조건 (Source일 경우)
+                # Source 데이터 반영
                 if isinstance(comps[conn['source']], Source):
-                    c.set_attr(fluid={'water': 1}, m=2, p=1, T=80 if "Hot" in conn['source'] else 20)
+                    p = st.session_state.comp_params[conn['source']]
+                    c.set_attr(fluid={'water': 1}, T=p.get('T', 20), p=p.get('p', 1), m=p.get('m', 2))
                 
                 tespy_conns.append(c)
             
             nw.add_conns(*tespy_conns)
             
-            # 열교환기 기본 설정
-            for obj in comps.values():
+            # 컴포넌트 특성값 반영
+            for name, obj in comps.items():
+                p = st.session_state.comp_params[name]
                 if isinstance(obj, HeatExchanger):
-                    obj.set_attr(pr1=0.98, pr2=0.98)
+                    obj.set_attr(pr1=p.get('pr1', 0.98), pr2=p.get('pr2', 0.98))
+                elif isinstance(obj, Pump):
+                    obj.set_attr(eta_s=p.get('eta_s', 0.8))
 
             nw.solve(mode='design')
+            st.success("해석 성공!")
             
-            st.success("해석 완료!")
-            st.dataframe(nw.results['Connection'])
+            # 결과 테이블
+            res_df = nw.results['Connection'][['m', 'p', 'T', 'h']]
+            st.dataframe(res_df)
             
         except Exception as e:
-            st.error(f"해석 오류: {e}")
+            st.error(f"오류 발생: {e}")
