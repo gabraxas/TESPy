@@ -1,60 +1,62 @@
 import streamlit as st
-import time
+from tespy.networks import Network
+from tespy.components import Sink, Source, HeatExchanger
+from tespy.connections import Connection
+import pandas as pd
 
-# ---------------------------------------------------------
-# 1. Tespi 연동 함수 (가상)
-# ---------------------------------------------------------
-def save_to_tespi(name, category, description):
-    """
-    Tespi 시스템(DB 또는 API)에 데이터를 저장하는 함수입니다.
-    현재는 시뮬레이션을 위해 1초 대기 후 성공(True)을 반환하도록 작성되었습니다.
-    """
-    # 실제 연동 시 아래와 같은 API 호출 또는 DB 쿼리 코드가 들어갑니다.
-    # import requests
-    # response = requests.post("https://api.tespi.com/components", json={...})
-    
-    time.sleep(1) # 네트워크 지연(저장 시간) 시뮬레이션
-    return True
+# 1. 페이지 설정
+st.set_page_config(page_title="TESPy Thermal Network Designer", layout="wide")
+st.title("🌡️ TESPy 열유체 네트워크 시뮬레이터")
 
-# ---------------------------------------------------------
-# 2. Streamlit UI 구성
-# ---------------------------------------------------------
-# 페이지 탭 기본 설정
-st.set_page_config(page_title="Tespi Component Manager", page_icon="⚙️")
+# 2. 사이드바: 유저 입력 인터페이스
+st.sidebar.header("Network Parameters")
+fluid = st.sidebar.selectbox("Fluid Type", ["water", "air", "NH3"])
+p_in = st.sidebar.slider("Inlet Pressure (bar)", 1.0, 20.0, 10.0)
+t_in = st.sidebar.slider("Inlet Temperature (°C)", 10, 200, 80)
+m_flow = st.sidebar.number_input("Mass Flow (kg/s)", value=5.0)
 
-st.title("⚙️ Tespi 콤포넌트 추가")
-st.markdown("Tespi 시스템에 새로운 콤포넌트를 등록합니다. 아래 양식을 정확히 입력해 주세요.")
-
-st.divider()
-
-# 폼(Form)을 생성하여 입력 데이터 묶기
-with st.form(key="component_form"):
-    st.subheader("📝 콤포넌트 정보 입력")
-    
-    # 입력 필드 구성
-    comp_name = st.text_input("콤포넌트 이름", placeholder="예: 회원가입 모듈, 결제 API 등")
-    comp_category = st.selectbox(
-        "콤포넌트 유형", 
-        ["Frontend (UI/UX)", "Backend (API)", "Database", "Infra", "기타"]
-    )
-    comp_desc = st.text_area("상세 설명", placeholder="해당 콤포넌트의 주요 역할과 특징을 설명해 주세요.")
-    
-    # 제출 버튼 (이 버튼을 눌러야만 폼 안의 데이터가 전송됨)
-    submitted = st.form_submit_button("Tespi에 등록하기")
-
-# ---------------------------------------------------------
-# 3. 폼 제출 후 동작 처리
-# ---------------------------------------------------------
-if submitted:
-    if not comp_name.strip():
-        # 필수 입력값 검증
-        st.warning("⚠️ 콤포넌트 이름을 입력해 주세요.")
-    else:
-        # 등록 진행 중 스피너 표시
-        with st.spinner(f"'{comp_name}'을(를) Tespi에 등록하고 있습니다..."):
-            is_success = save_to_tespi(comp_name, comp_category, comp_desc)
+if st.sidebar.button("Run Simulation"):
+    try:
+        # 3. TESPy 네트워크 구축
+        nw = Network(fluids=[fluid], T_unit='C', p_unit='bar', h_unit='kJ / kg')
+        
+        # 컴포넌트 생성
+        so1 = Source('Hot Source')
+        si1 = Sink('Hot Sink')
+        so2 = Source('Cold Source')
+        si2 = Sink('Cold Sink')
+        hx = HeatExchanger('Heat Exchanger')
+        
+        # 커넥션 설정
+        c1 = Connection(so1, 'out1', hx, 'in1', label='hot_in')
+        c2 = Connection(hx, 'out1', si1, 'in1', label='hot_out')
+        c3 = Connection(so2, 'out1', hx, 'in2', label='cold_in')
+        c4 = Connection(hx, 'out2', si2, 'in1', label='cold_out')
+        
+        nw.add_conns(c1, c2, c3, c4)
+        
+        # 경계 조건 입력
+        c1.set_attr(fluid={fluid: 1}, m=m_flow, p=p_in, T=t_in)
+        c3.set_attr(fluid={fluid: 1}, p=2, T=20)
+        hx.set_attr(pr1=0.98, pr2=0.98, ttd_u=5)
+        
+        # 4. 시뮬레이션 실행
+        nw.solve(mode='design')
+        
+        # 5. 결과 출력
+        st.success("Simulation Successful!")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            st.subheader("Connection Results")
+            st.dataframe(nw.results['Connection'])
             
-            if is_success:
-                st.success(f"✅ '{comp_name}' 콤포넌트가 성공적으로 추가되었습니다!")
-            else:
-                st.error("❌ 등록 중 오류가 발생했습니다. 시스템을 확인해 주세요.")
+        with col2:
+            st.subheader("Component Results")
+            st.dataframe(nw.results['HeatExchanger'])
+
+    except Exception as e:
+        st.error(f"Error during simulation: {e}")
+
+else:
+    st.info("왼쪽 사이드바에서 파라미터를 설정하고 'Run Simulation'을 클릭하세요.")
