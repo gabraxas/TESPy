@@ -1,89 +1,60 @@
 import streamlit as st
-from streamlit_react_flow import react_flow
-from tespy.networks import Network
-from tespy.components import Source, Sink, Pump, HeatExchanger
-from tespy.connections import Connection
+import time
 
-st.set_page_config(page_title="TESPy Advanced Designer", layout="wide")
+# ---------------------------------------------------------
+# 1. Tespi 연동 함수 (가상)
+# ---------------------------------------------------------
+def save_to_tespi(name, category, description):
+    """
+    Tespi 시스템(DB 또는 API)에 데이터를 저장하는 함수입니다.
+    현재는 시뮬레이션을 위해 1초 대기 후 성공(True)을 반환하도록 작성되었습니다.
+    """
+    # 실제 연동 시 아래와 같은 API 호출 또는 DB 쿼리 코드가 들어갑니다.
+    # import requests
+    # response = requests.post("https://api.tespi.com/components", json={...})
+    
+    time.sleep(1) # 네트워크 지연(저장 시간) 시뮬레이션
+    return True
 
-# 1. 초기 노드 구성 (열교환기 추가)
-if 'nodes' not in st.session_state:
-    st.session_state.nodes = [
-        {"id": "src_hot", "type": "input", "data": {"label": "Hot Inlet", "comp_type": "source"}, "position": {"x": 50, "y": 50}},
-        {"id": "src_cold", "type": "input", "data": {"label": "Cold Inlet", "comp_type": "source"}, "position": {"x": 50, "y": 250}},
-        {"id": "hx", "data": {"label": "Heat Exchanger", "comp_type": "heatexchanger"}, "position": {"x": 300, "y": 150}},
-        {"id": "snk_hot", "type": "output", "data": {"label": "Hot Outlet", "comp_type": "sink"}, "position": {"x": 550, "y": 50}},
-        {"id": "snk_cold", "type": "output", "data": {"label": "Cold Outlet", "comp_type": "sink"}, "position": {"x": 550, "y": 250}},
-    ]
-if 'edges' not in st.session_state:
-    st.session_state.edges = []
+# ---------------------------------------------------------
+# 2. Streamlit UI 구성
+# ---------------------------------------------------------
+# 페이지 탭 기본 설정
+st.set_page_config(page_title="Tespi Component Manager", page_icon="⚙️")
 
-# 2. 사이드바 설정
-st.sidebar.header("⚙️ Component Parameters")
-selected_node_id = st.sidebar.selectbox("Select Node", [n['id'] for n in st.session_state.nodes])
-node_data = next(n for n in st.session_state.nodes if n['id'] == selected_node_id)
-ctype = node_data['data']['comp_type']
+st.title("⚙️ Tespi 콤포넌트 추가")
+st.markdown("Tespi 시스템에 새로운 콤포넌트를 등록합니다. 아래 양식을 정확히 입력해 주세요.")
 
-params = {}
-with st.sidebar.container():
-    if ctype == "source":
-        params[f"{selected_node_id}_T"] = st.number_input(f"{selected_node_id} Temp (°C)", value=80 if "hot" in selected_node_id else 20)
-        params[f"{selected_node_id}_p"] = st.number_input(f"{selected_node_id} Press (bar)", value=1.0)
-    elif ctype == "heatexchanger":
-        params[f"{selected_node_id}_pr1"] = st.slider("Pressure Ratio Side 1", 0.8, 1.0, 0.98)
-        params[f"{selected_node_id}_pr2"] = st.slider("Pressure Ratio Side 2", 0.8, 1.0, 0.98)
+st.divider()
 
-# 3. 메인 인터페이스
-col1, col2 = st.columns([3, 1])
-with col1:
-    elements = react_flow("tespy_canvas", nodes=st.session_state.nodes, edges=st.session_state.edges)
+# 폼(Form)을 생성하여 입력 데이터 묶기
+with st.form(key="component_form"):
+    st.subheader("📝 콤포넌트 정보 입력")
+    
+    # 입력 필드 구성
+    comp_name = st.text_input("콤포넌트 이름", placeholder="예: 회원가입 모듈, 결제 API 등")
+    comp_category = st.selectbox(
+        "콤포넌트 유형", 
+        ["Frontend (UI/UX)", "Backend (API)", "Database", "Infra", "기타"]
+    )
+    comp_desc = st.text_area("상세 설명", placeholder="해당 콤포넌트의 주요 역할과 특징을 설명해 주세요.")
+    
+    # 제출 버튼 (이 버튼을 눌러야만 폼 안의 데이터가 전송됨)
+    submitted = st.form_submit_button("Tespi에 등록하기")
 
-with col2:
-    st.subheader("Solve")
-    if st.button("Run Simulation", use_container_width=True):
-        try:
-            # 네트워크 설정 (다중 유체 대응을 위해 리스트업)
-            nw = Network(fluids=['water'], T_unit='C', p_unit='bar')
+# ---------------------------------------------------------
+# 3. 폼 제출 후 동작 처리
+# ---------------------------------------------------------
+if submitted:
+    if not comp_name.strip():
+        # 필수 입력값 검증
+        st.warning("⚠️ 콤포넌트 이름을 입력해 주세요.")
+    else:
+        # 등록 진행 중 스피너 표시
+        with st.spinner(f"'{comp_name}'을(를) Tespi에 등록하고 있습니다..."):
+            is_success = save_to_tespi(comp_name, comp_category, comp_desc)
             
-            # 컴포넌트 객체화
-            comps = {}
-            for node in elements['nodes']:
-                nid, ct = node['id'], node['data']['comp_type']
-                if ct == "source": comps[nid] = Source(nid)
-                elif ct == "sink": comps[nid] = Sink(nid)
-                elif ct == "heatexchanger": comps[nid] = HeatExchanger(nid)
-            
-            # 연결 로직 (포트 매핑 핵심)
-            conns = []
-            for edge in elements['edges']:
-                s_id, t_id = edge['source'], edge['target']
-                # React-flow의 handle ID가 없으면 기본값 in1, out1 사용
-                s_port = edge.get('sourceHandle', 'out1')
-                t_port = edge.get('targetHandle', 'in1')
-                
-                # 열교환기 판별 (Hot/Cold 입출력 매핑)
-                # 실제 구현 시 React-flow 노드에서 핸들 ID를 'in1', 'in2' 등으로 넘겨줘야 함
-                c = Connection(comps[s_id], s_port, comps[t_id], t_port)
-                
-                # 소스 노드인 경우 경계 조건 할당
-                if isinstance(comps[s_id], Source):
-                    c.set_attr(fluid={'water': 1}, 
-                               T=params.get(f"{s_id}_T", 20), 
-                               p=params.get(f"{s_id}_p", 1), 
-                               m=2)
-                conns.append(c)
-            
-            nw.add_conns(*conns)
-            
-            # 열교환기 특성 할당
-            for nid, obj in comps.items():
-                if isinstance(obj, HeatExchanger):
-                    obj.set_attr(pr1=params.get(f"{nid}_pr1", 0.98), 
-                                 pr2=params.get(f"{nid}_pr2", 0.98))
-            
-            nw.solve(mode='design')
-            st.success("Analysis Complete!")
-            st.dataframe(nw.results['Connection'])
-            
-        except Exception as e:
-            st.error(f"Error: {e}")
+            if is_success:
+                st.success(f"✅ '{comp_name}' 콤포넌트가 성공적으로 추가되었습니다!")
+            else:
+                st.error("❌ 등록 중 오류가 발생했습니다. 시스템을 확인해 주세요.")
