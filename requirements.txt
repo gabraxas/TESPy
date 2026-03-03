@@ -5,4 +5,4 @@ CoolProp
 matplotlib
 numpy
 pandas
-streamlit-element
+streamlit-elements
