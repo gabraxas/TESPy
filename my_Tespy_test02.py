@@ -9,7 +9,6 @@ from tespy.tools import ExergyAnalysis
 
 import graphviz
 import pandas as pd
-import plotly.graph_objects as go
 
 
 def draw_example_refrigeration_cycle():
