@@ -15,15 +15,17 @@ from pathlib import Path
 
 def load_example_refrigeration_cycle():
     """
-    Show example cycle using ./figure/aa.svg.
+    Show an example basic vapor compression refrigeration cycle diagram
+    using a local SVG file in the same directory as this script.
     """
-    svg_path = Path("./flowsheet.svg")
+    # 현재 파일(my_Tespy_test02.py) 기준으로 같은 디렉토리의 SVG
+    svg_path = Path(__file__).parent / "flowsheet.svg"  # 파일 이름만 바꿔주면 됨
 
     if not svg_path.exists():
         st.warning(f"Example cycle SVG not found: {svg_path}")
         return
 
-    # Read SVG as bytes and display
+    # 방법 1: st.image로 SVG 표시
     with open(svg_path, "rb") as f:
         svg_bytes = f.read()
 
