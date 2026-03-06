@@ -57,7 +57,7 @@ if "comp_params" not in st.session_state:
         "HeatExchanger":   {"pr": 0.99, "T_out": 40.0, "x_out": 0.0},        
     }
 if "fluid" not in st.session_state:
-    st.session_state.fluid = "R134a"
+    st.session_state.fluid = "water"
 if "mass_flow" not in st.session_state:
     st.session_state.mass_flow = 0.05
 
