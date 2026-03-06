@@ -26,6 +26,7 @@ def draw_example_refrigeration_cycle():
         "fontname": "NanumGothic, Malgun Gothic, Arial",
         "fontsize": "10"
     }
+    
 
     # 기본 사이클 노드
     dot_ex.node("Evap",   "Evaporator\n(증발기)",  fillcolor="#80cbc4", **node_style)
