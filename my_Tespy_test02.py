@@ -17,7 +17,7 @@ def load_example_refrigeration_cycle():
     """
     Show example cycle using ./figure/aa.svg.
     """
-    svg_path = "flowsheet.svg"
+    svg_path = Path("./flowsheet.svg")
 
     if not svg_path.exists():
         st.warning(f"Example cycle SVG not found: {svg_path}")
