@@ -172,6 +172,7 @@ def run_exergy_example():
     )
     ean.analyse(pamb=pamb, Tamb=Tamb)
 
+    
     # Sankey 입력
     links, nodes = ean.generate_plotly_sankey_input(display_thresold=1000)
     # 정규화 (연료 exergy 기준)
