@@ -32,7 +32,7 @@ def load_example_refrigeration_cycle():
     st.image(
         svg_bytes,
         caption="Example of a basic vapor compression refrigeration cycle",
-        use_container_width=True,
+        use_container_width=400,
     )
 
 
