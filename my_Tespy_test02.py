@@ -9,8 +9,8 @@ from tespy.tools import ExergyAnalysis
 
 import graphviz
 import pandas as pd
-from pathlib import path
-from PIL import Image
+#from pathlib import path
+#from PIL import Image
 
 
 def load_example_refrigeration_cycle():
