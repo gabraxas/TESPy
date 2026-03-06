@@ -1,4 +1,4 @@
-import steamlit as st
+import streamlit as st
 from tespy.networks import Network
 from tespy.components import (Source, Sink, Compressor, Condenser, ExpansionValve, Evaporator)
 from tespy.connections import Connection
@@ -11,13 +11,13 @@ def run_simulation(evap_temp, cond_temp, eta_s):
     
     # 컴포넌트 정의...
     # 커넥션 정의 및 파라미터 설정 (매개변수 반영)
-    # nw.solve(mode='design')
+     nw.solve(mode='design')
     
     # 2. 엑서지 분석 수행
     # ean = ExergyAnalysis(...)
     # ean.analyse(...)
     
-    return nw, ean
+    return nw
 
 st.title("Refrigeration Cycle Exergy Analysis")
 
