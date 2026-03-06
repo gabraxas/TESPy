@@ -9,7 +9,7 @@ from tespy.tools import ExergyAnalysis
 
 import graphviz
 import pandas as pd
-from pathlib import path
+from pathlib import Path
 #from PIL import Image
 
 
