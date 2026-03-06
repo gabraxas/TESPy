@@ -54,8 +54,6 @@ def draw_example_refrigeration_cycle():
 
     st.graphviz_chart(dot_ex, use_container_width=True)
 
-
-
 # 1. 페이지 설정
 st.set_page_config(layout="wide", page_title="TESPy Refrigerator Designer")
 st.title("❄️ TESPy 냉동 사이클 시스템 설계기 (v2.0)")
