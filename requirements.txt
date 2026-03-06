@@ -7,3 +7,4 @@ numpy
 pandas
 streamlit-elements
 graphviz
+ploty.graph_objects
