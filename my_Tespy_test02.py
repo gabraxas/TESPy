@@ -1,7 +1,7 @@
 import streamlit as st
 from tespy.networks import Network
 from tespy.components import (
-    CycleCloser, Compressor, Condenser, Valve, Evaporator,
+    CycleCloser, Compressor, Condenser, Valve,
     Sink, Source, Turbine, HeatExchanger
 )
 from tespy.connections import Connection, Bus
