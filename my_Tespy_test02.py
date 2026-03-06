@@ -9,6 +9,30 @@ from tespy.tools import ExergyAnalysis
 
 import graphviz
 import pandas as pd
+from pathlib import path
+from PIL import Image
+
+
+def load_example_refrigeration_cycle():
+    """
+    Show example cycle using ./figure/aa.svg.
+    """
+    svg_path = "flowsheet.svg"
+
+    if not svg_path.exists():
+        st.warning(f"Example cycle SVG not found: {svg_path}")
+        return
+
+    # Read SVG as bytes and display
+    with open(svg_path, "rb") as f:
+        svg_bytes = f.read()
+
+    st.image(
+        svg_bytes,
+        caption="Example of a basic vapor compression refrigeration cycle",
+        use_container_width=True,
+    )
+
 
 
 def draw_example_refrigeration_cycle():
@@ -259,7 +283,7 @@ with col_graph:
         "refrigeration cycle that you can use as a reference when "
         "building your system."
     )
-    draw_example_refrigeration_cycle()
+    load_example_refrigeration_cycle()
 
     # Standard refrigeration cycle info
     st.info(
