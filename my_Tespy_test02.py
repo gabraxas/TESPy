@@ -36,66 +36,12 @@ def load_example_refrigeration_cycle():
     )
 
 
-
-def draw_example_refrigeration_cycle():
-    """
-    Create an example basic vapor compression refrigeration cycle diagram
-    to show in the Streamlit "System Diagram" area as a reference.
-    """
-    dot_ex = graphviz.Digraph()
-    dot_ex.attr(rankdir='LR', bgcolor='#ffffff')
-
-    # Node style
-    node_style = {
-        "style": "filled",
-        "shape": "box",
-        "fontname": "Arial",
-        "fontsize": "10"
-    }
-
-    # Basic cycle nodes
-    dot_ex.node("Evap",   "Evaporator",               fillcolor="#80cbc4", **node_style)
-    dot_ex.node("Comp",   "Compressor",               fillcolor="#ffcc80", **node_style)
-    dot_ex.node("Cond",   "Condenser",                fillcolor="#ef9a9a", **node_style)
-    dot_ex.node("Valve",  "Expansion Valve",          fillcolor="#ce93d8", **node_style)
-
-    # Edges and state points (1~4)
-    edge_style = {"fontsize": "9", "fontname": "Arial"}
-
-    dot_ex.edge("Evap", "Comp",
-                label="1 → 2\nLow-pressure, low-temperature vapor",
-                **edge_style)
-    dot_ex.edge("Comp", "Cond",
-                label="2 → 3\nHigh-pressure, high-temperature vapor",
-                **edge_style)
-    dot_ex.edge("Cond", "Valve",
-                label="3 → 4\nHigh-pressure liquid",
-                **edge_style)
-    dot_ex.edge("Valve", "Evap",
-                label="4 → 1\nLow-pressure liquid/vapor mixture",
-                **edge_style)
-
-    # Simple description box
-    dot_ex.attr(
-        label=(
-            "Basic vapor compression refrigeration cycle (example)\n"
-            "1: Evaporator outlet (low-pressure, low-temperature vapor)\n"
-            "2: Compressor outlet (high-pressure, high-temperature vapor)\n"
-            "3: Condenser outlet (high-pressure liquid)\n"
-            "4: Expansion valve outlet (low-pressure liquid/vapor mixture)"
-        )
-    )
-    dot_ex.attr(labelloc="b", fontsize="9")
-
-    st.graphviz_chart(dot_ex, use_container_width=True)
-
-
 # 1. Page config
 st.set_page_config(layout="wide", page_title="TESPy Refrigerator Designer")
 st.title("TESPy Refrigeration Cycle System Designer (v2.0)")
 
 # --- Fixed component list for refrigeration cycle ---
-REFRIG_COMP_LIST = ["CycleCloser", "Compressor", "Condenser", "Valve", "Evaporator"]
+REFRIG_COMP_LIST = ["Source", "Sink", "CycleCloser", "Compressor", "Turbine", "HeatExchanger"]
 
 # --- 2. Session state management (data persistence) ---
 if "connections" not in st.session_state:
@@ -103,11 +49,12 @@ if "connections" not in st.session_state:
 if "comp_params" not in st.session_state:
     # Default parameter set for the refrigeration cycle
     st.session_state.comp_params = {
+        "Source":{"T":-10, "pr":1},
+        "Sink":{"T":25,"pr":1.5},
         "CycleCloser": {},
+        "Turbine":{"eta_s":0.8},
         "Compressor":  {"eta_s": 0.8},
-        "Condenser":   {"pr": 0.99, "T_out": 40.0, "x_out": 0.0},
-        "Valve":       {"pr": 1.0},
-        "Evaporator":  {"pr": 0.99, "T_out": 5.0,  "x_out": 1.0},
+        "HeatExchanger":   {"pr": 0.99, "T_out": 40.0, "x_out": 0.0},        
     }
 if "fluid" not in st.session_state:
     st.session_state.fluid = "R134a"
@@ -121,8 +68,8 @@ with st.sidebar:
     # Working fluid selection
     st.session_state.fluid = st.selectbox(
         "Working fluid",
-        ["R134a", "R22", "R410A", "R32", "R600a"],
-        index=["R134a", "R22", "R410A", "R32", "R600a"].index(st.session_state.fluid)
+        ["Air", "water"],
+        index=["Air","water"].index(st.session_state.fluid)
     )
     st.session_state.mass_flow = st.number_input(
         "Mass flow rate (kg/s)",
@@ -152,11 +99,15 @@ with st.sidebar:
         # Auto-build standard refrigeration cycle
         if st.button("Build standard refrigeration cycle", use_container_width=True):
             st.session_state.connections = [
-                {"source": "CycleCloser", "target": "Compressor", "s_port": "out1", "t_port": "in1"},
-                {"source": "Compressor",  "target": "Condenser",  "s_port": "out1", "t_port": "in1"},
-                {"source": "Condenser",   "target": "Valve",      "s_port": "out1", "t_port": "in1"},
-                {"source": "Valve",       "target": "Evaporator", "s_port": "out1", "t_port": "in1"},
-                {"source": "Evaporator",  "target": "CycleCloser","s_port": "out1", "t_port": "in1"},
+                {"source": "HeatExchanger(Cold)", "target": "CycleCloser", "s_port": "out2", "t_port": "in1"},
+                {"source": "CycleCloser",  "target": "Compressor",  "s_port": "out1", "t_port": "in1"},
+                {"source": "Compressor",   "target": "HeatExchanger(Hot)",      "s_port": "out1", "t_port": "in1"},
+                {"source": "HeatExchanger(Hot)",       "target": "Turbine", "s_port": "out1", "t_port": "in1"},
+                {"source": "Turbine",  "target": "HeatExchanger(Cold)","s_port": "out1", "t_port": "in1"},
+                {"source": "Source(Air)",  "target": "HeatExchanger(Cold)","s_port": "out1", "t_port": "in1"},                
+                {"source": "HeatExchanger(Cold)",  "target": "Sink(Air)","s_port": "out1", "t_port": "in1"},
+                {"source": "Source(Water)",  "target": "HeatExchanger(Hot)","s_port": "out1", "t_port": "in2"},                
+                {"source": "HeatExchanger(Hot)",  "target": "Sink(Water)","s_port": "out2", "t_port": "in1"},
             ]
             st.rerun()
 
