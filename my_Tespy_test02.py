@@ -1,8 +1,6 @@
 import streamlit as st
 from tespy.networks import Network
-from tespy.components import (
-    CycleCloser, Compressor, Condenser, Valve, HeatExchangerSimple
-)
+from tespy.components import (CycleCloser, Compressor, Condenser, Valve, HeatExchangerSimple)
 from tespy.connections import Connection
 import graphviz
 import pandas as pd
