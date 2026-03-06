@@ -249,9 +249,9 @@ with col_res:
                     elif name == "Compressor":
                         comps[name] = Compressor(name)
                     elif name == "Condenser":
-                        comps[name] = HeatExchangerSimple(name)
+                        comps[name] = Condenser(name)
                     elif name == "Evaporator":
-                        comps[name] = HeatExchangerSimple(name)
+                        comps[name] = Evaporator(name)
                     elif name == "Valve":
                         comps[name] = Valve(name)
 
@@ -261,7 +261,7 @@ with col_res:
                     p = params_all.get(name, {})
                     if isinstance(obj, Compressor):
                         obj.set_attr(eta_s=p.get('eta_s', 0.8))
-                    elif isinstance(obj, HeatExchangerSimple):
+                    elif isinstance(obj, Evaporator):
                         obj.set_attr(pr=p.get('pr', 0.99))
                     elif isinstance(obj, Valve):
                         # Valve의 pr은 자동 계산 (DOF 처리)
