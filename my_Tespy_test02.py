@@ -1,9 +1,16 @@
 import streamlit as st
 from tespy.networks import Network
-from tespy.components import (CycleCloser, Compressor, Condenser, Valve, Evaporator)
-from tespy.connections import Connection
+from tespy.components import (
+    CycleCloser, Compressor, Condenser, Valve, Evaporator,
+    Sink, Source, Turbine, HeatExchanger
+)
+from tespy.connections import Connection, Bus
+from tespy.tools import ExergyAnalysis
+
 import graphviz
 import pandas as pd
+import plotly.graph_objects as go
+
 
 def draw_example_refrigeration_cycle():
     """
@@ -41,11 +48,157 @@ def draw_example_refrigeration_cycle():
         "1: 증발기 출구 (저압·저온 증기)\n"
         "2: 압축기 출구 (고압·고온 증기)\n"
         "3: 응축기 출구 (고압 액)\n"
-        "4: 팽창밸브 출구 (저압 액/증기 혼합)"
+        "4: 팽창밸브 출구 (저��� 액/증기 혼합)"
     ))
     dot_ex.attr(labelloc="b", fontsize="9")
 
     st.graphviz_chart(dot_ex, use_container_width=True)
+
+
+# ─────────────────────────────────────────────
+# Exergy 네트워크 예시 (간단 버전, 버튼으로 실행)
+# ─────────────────────────────────────────────
+
+def run_exergy_example():
+    """
+    간단한 TESPy 네트워크 + ExergyAnalysis 예시를 실행하고
+    COP 비슷한 지표 및 Sankey를 반환하는 헬퍼 함수.
+
+    원본 예시 구조를 최대한 유지하되,
+    - 파일 출력, CSV 검증 등은 생략
+    - Streamlit에 표시하기 좋은 형태로 요약
+    """
+
+    # ambient state
+    pamb = 1
+    Tamb = 25
+
+    # setting up network
+    nw = Network()
+    nw.set_attr(
+        T_unit='C', p_unit='bar', h_unit='kJ / kg', m_unit='kg / s',
+        s_unit="kJ / kgK"
+    )
+
+    # components definition
+    water_in = Source('Water source')
+    water_out = Sink('Water sink')
+
+    air_in = Source('Air source')
+    air_out = Sink('Air sink')
+
+    closer = CycleCloser('Cycle closer')
+
+    cp = Compressor('Compressor')
+    turb = Turbine('Turbine')
+
+    cold = HeatExchanger('Cooling heat exchanger')
+    hot = HeatExchanger('Heat sink heat exchanger')
+
+    # connections definition
+    # power cycle
+    c0 = Connection(cold, 'out2', closer, 'in1', label='0')
+    c1 = Connection(closer, 'out1', cp, 'in1', label='1')
+    c2 = Connection(cp, 'out1', hot, 'in1', label='2')
+    c3 = Connection(hot, 'out1', turb, 'in1', label='3')
+    c4 = Connection(turb, 'out1', cold, 'in2', label='4')
+
+    c11 = Connection(air_in, 'out1', cold, 'in1', label='11')
+    c12 = Connection(cold, 'out1', air_out, 'in1', label='12')
+
+    c21 = Connection(water_in, 'out1', hot, 'in2', label='21')
+    c22 = Connection(hot, 'out2', water_out, 'in1', label='22')
+
+    # add connections to network
+    nw.add_conns(c0, c1, c2, c3, c4, c11, c12, c21, c22)
+
+    # power bus
+    power = Bus('power input')
+    power.add_comps(
+        {'comp': turb, 'char': 1, 'base': 'component'},
+        {'comp': cp, 'char': 1, 'base': 'bus'}
+    )
+
+    cool_product_bus = Bus('cooling')
+    cool_product_bus.add_comps(
+        {'comp': air_in, 'base': 'bus'},
+        {'comp': air_out}
+    )
+
+    heat_loss_bus = Bus('heat sink')
+    heat_loss_bus.add_comps(
+        {'comp': water_in, 'base': 'bus'},
+        {'comp': water_out}
+    )
+
+    nw.add_busses(power, cool_product_bus, heat_loss_bus)
+
+    # connection parameters
+    c0.set_attr(T=-30, p=1, fluid={'Air': 1, 'water': 0})
+    c2.set_attr(p=5.25)
+    c3.set_attr(p=5, T=35)
+    c4.set_attr(p=1.05)
+
+    c11.set_attr(fluid={'Air': 1, 'water': 0}, T=-10, p=1)
+    c12.set_attr(p=1, T=-20)
+
+    c21.set_attr(fluid={'Air': 0, 'water': 1}, T=25, p=1.5)
+    c22.set_attr(p=1.5, T=40)
+
+    # component parameters
+    turb.set_attr(eta_s=0.8)
+    cp.set_attr(eta_s=0.8)
+    cold.set_attr(Q=-100e3)
+
+    # 1차 해석
+    nw.solve(mode='design')
+
+    # 효율 조정 (원본 예시의 eta 사용)
+    eta = 0.961978
+    nw.del_busses(power)
+    power = Bus('power input')
+    power.add_comps(
+        {'comp': turb, 'char': eta, 'base': 'component'},
+        {'comp': cp, 'char': eta, 'base': 'bus'}
+    )
+    nw.add_busses(power)
+    nw.solve(mode='design')
+
+    # Exergy 분석
+    ean = ExergyAnalysis(
+        nw,
+        E_P=[cool_product_bus],
+        E_F=[power],
+        E_L=[heat_loss_bus]
+    )
+    ean.analyse(pamb=pamb, Tamb=Tamb)
+
+    # Sankey 입력
+    links, nodes = ean.generate_plotly_sankey_input(display_thresold=1000)
+    # 정규화 (연료 exergy 기준)
+    if links['value']:
+        base = links['value'][0]
+        if base != 0:
+            links['value'] = [v / base for v in links['value']]
+
+    # 간단한 성능 지표: Exergy 효율 및 주요 exergy 흐름 요약
+    # (ean.network_data는 Series)
+    net_data = ean.network_data
+    epsilon = float(net_data.get('epsilon', float('nan')))
+    E_F = float(net_data.get('E_F', float('nan')))
+    E_P = float(net_data.get('E_P', float('nan')))
+    E_L = float(net_data.get('E_L', float('nan')))
+
+    return {
+        "nw": nw,
+        "ean": ean,
+        "links": links,
+        "nodes": nodes,
+        "epsilon": epsilon,
+        "E_F": E_F,
+        "E_P": E_P,
+        "E_L": E_L
+    }
 
 
 # 1. 페이지 설정
@@ -210,7 +363,7 @@ with col_graph:
                  label=f"{c['s_port']}→{c['t_port']}", fontsize='9')
 
     st.graphviz_chart(dot)
-    # --- (새로 추가) 예시 냉동 사이클 그림 ---
+    # --- 예시 냉동 사이클 그림 ---
     st.caption("아래는 컴포넌트를 배치할 때 참고할 수 있는 기본 증기 압축 냉동 사이클 예시입니다.")
     draw_example_refrigeration_cycle()
     
@@ -224,6 +377,7 @@ with col_graph:
 with col_res:
     st.subheader("🚀 시뮬레이션 결과")
 
+    # 사용자 정의 냉동 사이클 해석
     if st.button("❄️ 해석 실행 (Solve)", use_container_width=True):
         if not st.session_state.connections:
             st.warning("⚠️ 연결이 없습니다. 먼저 연결을 추가하세요.")
@@ -266,6 +420,8 @@ with col_res:
                     elif isinstance(obj, Valve):
                         # Valve의 pr은 자동 계산 (DOF 처리)
                         pass
+                    elif isinstance(obj, Condenser):
+                        obj.set_attr(pr=p.get('pr', 0.99))
 
                 # 연결 생성
                 tespy_conns = []
@@ -299,7 +455,7 @@ with col_res:
                         x=p_ev.get('x_out', 1.0)
                     )
 
-                # Condenser → Valve: 응 condensate 출구 온도 & 건도 지정
+                # Condenser → Valve: 응축기 출구 온도 & 건도 지정
                 if key_cd_out in conn_map:
                     p_cd = params_all.get("Condenser", {})
                     conn_map[key_cd_out].set_attr(
@@ -320,14 +476,14 @@ with col_res:
                 # --- 성능 지표 계산 (COP) ---
                 st.subheader("📊 냉동 사이클 성능 지표")
 
-                # 압축기 소비 동력
                 comp_obj = comps.get("Compressor")
                 evap_obj = comps.get("Evaporator")
 
                 if comp_obj is not None and evap_obj is not None:
                     try:
-                        W_comp = abs(nw.results['Compressor'].loc['Compressor', 'P'])  # W
-                        Q_evap = abs(nw.results['HeatExchangerSimple'].loc['Evaporator', 'Q'])  # W
+                        # NOTE: TESPy 결과 구조에 따라 이 부분은 조정이 필요할 수 있음
+                        W_comp = abs(nw.results['Component'].loc['Compressor', 'P'])  # W
+                        Q_evap = abs(nw.results['Component'].loc['Evaporator', 'Q'])  # W
 
                         COP = Q_evap / W_comp if W_comp > 0 else float('nan')
 
@@ -337,6 +493,8 @@ with col_res:
                         kpi_col3.metric("냉동 COP", f"{COP:.3f}")
                     except Exception as kpi_err:
                         st.warning(f"성능 지표 계산 중 오류: {kpi_err}")
+                else:
+                    st.info("Compressor 또는 Evaporator가 네트워크에 없습니다.")
 
             except Exception as e:
                 st.error(f"❌ 해석 실패: {e}")
@@ -347,3 +505,43 @@ with col_res:
                 - **경계 조건**: 증발기 출구(T, x)와 응축기 출구(T, x) 값이 유효한지 확인하세요.
                 - **냉매 범위**: 설정한 온도가 선택 냉매의 동작 범위 내에 있는지 확인하세요.
                 """)
+
+    st.markdown("---")
+    st.subheader("📘 TESPy 네트워크 예시 (터빈+콤프+열교환기 + Exergy)")
+
+    if st.button("⚙️ 예시 네트워크 실행 (Exergy 예시)", use_container_width=True):
+        try:
+            example = run_exergy_example()
+            st.success("✅ 예시 네트워크 해석 및 Exergy 분석 성공!")
+
+            # 간단한 네트워크 지표
+            k1, k2, k3, k4 = st.columns(4)
+            k1.metric("연료 Exergy E_F (W)", f"{example['E_F']:.1f}")
+            k2.metric("제품 Exergy E_P (W)", f"{example['E_P']:.1f}")
+            k3.metric("손실 Exergy E_L (W)", f"{example['E_L']:.1f}")
+            k4.metric("Exergy 효율 ε (-)", f"{example['epsilon']:.3f}")
+
+            # Sankey 다이어그램
+            st.markdown("#### 🔁 Exergy 흐름 Sankey 다이어그램")
+            fig = go.Figure(go.Sankey(
+                arrangement="snap",
+                textfont={"family": "Linux Libertine O"},
+                node={
+                    "label": example["nodes"],
+                    "pad": 11,
+                    "color": "orange",
+                },
+                link=example["links"],
+            ))
+            st.plotly_chart(fig, use_container_width=True)
+
+            st.info(
+                "이 예시는 TESPy의 `Network`, `Source/Sink`, `Compressor`, `Turbine`, "
+                "`HeatExchanger`, `Bus`, `ExergyAnalysis`를 사용해 "
+                "전형적인 파워-냉각 사이클의 Exergy 흐름을 보여주는 간단한 데모입니다."
+            )
+
+        except Exception as ex:
+            st.error(f"❌ 예시 네트워크 실행 실패: {ex}")
+            st.write("TESPy 버전 또는 설치 환경에 따라 일부 속성명이 다를 수 있습니다. "
+                     "필요하면 `run_exergy_example` 함수 내 파라미터를 조정하세요.")
