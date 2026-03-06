@@ -5,6 +5,49 @@ from tespy.connections import Connection
 import graphviz
 import pandas as pd
 
+def draw_example_refrigeration_cycle():
+    """
+    Streamlit '시스템 다이어그램' 영역에서 참고용으로 보여줄
+    기본 냉동 사이클(증기 압축 냉동 사이클) 예시 그림을 생성한다.
+    """
+    dot_ex = graphviz.Digraph()
+    dot_ex.attr(rankdir='LR', bgcolor='#ffffff')
+
+    # 노드 스타일
+    node_style = {
+        "style": "filled",
+        "shape": "box",
+        "fontname": "NanumGothic, Malgun Gothic, Arial",
+        "fontsize": "10"
+    }
+
+    # 기본 사이클 노드
+    dot_ex.node("Evap",   "Evaporator\n(증발기)",  fillcolor="#80cbc4", **node_style)
+    dot_ex.node("Comp",   "Compressor\n(압축기)", fillcolor="#ffcc80", **node_style)
+    dot_ex.node("Cond",   "Condenser\n(응축기)",  fillcolor="#ef9a9a", **node_style)
+    dot_ex.node("Valve",  "Expansion Valve\n(팽창밸브)", fillcolor="#ce93d8", **node_style)
+
+    # 화살표 및 상태점 (1~4)
+    edge_style = {"fontsize": "9", "fontname": "NanumGothic, Malgun Gothic, Arial"}
+
+    dot_ex.edge("Evap", "Comp",   label="1 → 2\n저압·저온 증기", **edge_style)
+    dot_ex.edge("Comp", "Cond",   label="2 → 3\n고압·고온 증기", **edge_style)
+    dot_ex.edge("Cond", "Valve",  label="3 → 4\n고압 액",       **edge_style)
+    dot_ex.edge("Valve","Evap",   label="4 → 1\n저압 액/증기 혼합", **edge_style)
+
+    # 간단한 설명 박스
+    dot_ex.attr(label=(
+        "기본 증기 압축 냉동 사이클 예시\n"
+        "1: 증발기 출구 (저압·저온 증기)\n"
+        "2: 압축기 출구 (고압·고온 증기)\n"
+        "3: 응축기 출구 (고압 액)\n"
+        "4: 팽창밸브 출구 (저압 액/증기 혼합)"
+    ))
+    dot_ex.attr(labelloc="b", fontsize="9")
+
+    st.graphviz_chart(dot_ex, use_container_width=True)
+
+
 # 1. 페이지 설정
 st.set_page_config(layout="wide", page_title="TESPy Refrigerator Designer")
 st.title("❄️ TESPy 냉동 사이클 시스템 설계기 (v2.0)")
