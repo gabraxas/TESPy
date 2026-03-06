@@ -13,59 +13,69 @@ import pandas as pd
 
 def draw_example_refrigeration_cycle():
     """
-    Streamlit '시스템 다이어그램' 영역에서 참고용으로 보여줄
-    기본 냉동 사이클(증기 압축 냉동 사이클) 예시 그림을 생성한다.
+    Create an example basic vapor compression refrigeration cycle diagram
+    to show in the Streamlit "System Diagram" area as a reference.
     """
     dot_ex = graphviz.Digraph()
     dot_ex.attr(rankdir='LR', bgcolor='#ffffff')
 
-    # 노드 스타일
+    # Node style
     node_style = {
         "style": "filled",
         "shape": "box",
-        "fontname": "NanumGothic, Malgun Gothic, Arial",
+        "fontname": "Arial",
         "fontsize": "10"
     }
-    
 
-    # 기본 사이클 노드
-    dot_ex.node("Evap",   "Evaporator\n(증발기)",  fillcolor="#80cbc4", **node_style)
-    dot_ex.node("Comp",   "Compressor\n(압축기)", fillcolor="#ffcc80", **node_style)
-    dot_ex.node("Cond",   "Condenser\n(응축기)",  fillcolor="#ef9a9a", **node_style)
-    dot_ex.node("Valve",  "Expansion Valve\n(팽창밸브)", fillcolor="#ce93d8", **node_style)
+    # Basic cycle nodes
+    dot_ex.node("Evap",   "Evaporator",               fillcolor="#80cbc4", **node_style)
+    dot_ex.node("Comp",   "Compressor",               fillcolor="#ffcc80", **node_style)
+    dot_ex.node("Cond",   "Condenser",                fillcolor="#ef9a9a", **node_style)
+    dot_ex.node("Valve",  "Expansion Valve",          fillcolor="#ce93d8", **node_style)
 
-    # 화살표 및 상태점 (1~4)
-    edge_style = {"fontsize": "9", "fontname": "NanumGothic, Malgun Gothic, Arial"}
+    # Edges and state points (1~4)
+    edge_style = {"fontsize": "9", "fontname": "Arial"}
 
-    dot_ex.edge("Evap", "Comp",   label="1 → 2\n저압·저온 증기", **edge_style)
-    dot_ex.edge("Comp", "Cond",   label="2 → 3\n고압·고온 증기", **edge_style)
-    dot_ex.edge("Cond", "Valve",  label="3 → 4\n고압 액",       **edge_style)
-    dot_ex.edge("Valve","Evap",   label="4 → 1\n저압 액/증기 혼합", **edge_style)
+    dot_ex.edge("Evap", "Comp",
+                label="1 → 2\nLow-pressure, low-temperature vapor",
+                **edge_style)
+    dot_ex.edge("Comp", "Cond",
+                label="2 → 3\nHigh-pressure, high-temperature vapor",
+                **edge_style)
+    dot_ex.edge("Cond", "Valve",
+                label="3 → 4\nHigh-pressure liquid",
+                **edge_style)
+    dot_ex.edge("Valve", "Evap",
+                label="4 → 1\nLow-pressure liquid/vapor mixture",
+                **edge_style)
 
-    # 간단한 설명 박스
-    dot_ex.attr(label=(
-        "기본 증기 압축 냉동 사이클 예시\n"
-        "1: 증발기 출구 (저압·저온 증기)\n"
-        "2: 압축기 출구 (고압·고온 증기)\n"
-        "3: 응축기 출구 (고압 액)\n"
-        "4: 팽창밸브 출구 (저��� 액/증기 혼합)"
-    ))
+    # Simple description box
+    dot_ex.attr(
+        label=(
+            "Basic vapor compression refrigeration cycle (example)\n"
+            "1: Evaporator outlet (low-pressure, low-temperature vapor)\n"
+            "2: Compressor outlet (high-pressure, high-temperature vapor)\n"
+            "3: Condenser outlet (high-pressure liquid)\n"
+            "4: Expansion valve outlet (low-pressure liquid/vapor mixture)"
+        )
+    )
     dot_ex.attr(labelloc="b", fontsize="9")
 
     st.graphviz_chart(dot_ex, use_container_width=True)
 
-# 1. 페이지 설정
-st.set_page_config(layout="wide", page_title="TESPy Refrigerator Designer")
-st.title("❄️ TESPy 냉동 사이클 시스템 설계기 (v2.0)")
 
-# --- 냉동 사이클 고정 컴포넌트 목록 ---
+# 1. Page config
+st.set_page_config(layout="wide", page_title="TESPy Refrigerator Designer")
+st.title("TESPy Refrigeration Cycle System Designer (v2.0)")
+
+# --- Fixed component list for refrigeration cycle ---
 REFRIG_COMP_LIST = ["CycleCloser", "Compressor", "Condenser", "Valve", "Evaporator"]
 
-# --- 2. 세션 상태 관리 (데이터 유지) ---
+# --- 2. Session state management (data persistence) ---
 if "connections" not in st.session_state:
     st.session_state.connections = []
 if "comp_params" not in st.session_state:
-    # 냉동 사이클 기본 파라미터 셋
+    # Default parameter set for the refrigeration cycle
     st.session_state.comp_params = {
         "CycleCloser": {},
         "Compressor":  {"eta_s": 0.8},
@@ -78,39 +88,43 @@ if "fluid" not in st.session_state:
 if "mass_flow" not in st.session_state:
     st.session_state.mass_flow = 0.05
 
-# --- 3. 사이드바: 인터페이스 구성 ---
+# --- 3. Sidebar: UI layout ---
 with st.sidebar:
-    st.header("🛠️ 냉동 사이클 빌더")
+    st.header("Refrigeration Cycle Builder")
 
-    # 냉매 선택
+    # Working fluid selection
     st.session_state.fluid = st.selectbox(
-        "냉매 선택", ["R134a", "R22", "R410A", "R32", "R600a"],
+        "Working fluid",
+        ["R134a", "R22", "R410A", "R32", "R600a"],
         index=["R134a", "R22", "R410A", "R32", "R600a"].index(st.session_state.fluid)
     )
     st.session_state.mass_flow = st.number_input(
-        "냉매 유량 (kg/s)", min_value=0.001, value=st.session_state.mass_flow, step=0.005
+        "Mass flow rate (kg/s)",
+        min_value=0.001,
+        value=st.session_state.mass_flow,
+        step=0.005
     )
     st.divider()
 
-    tab1, tab2 = st.tabs(["🔗 연결 관리", "📝 수치 설정" ])
+    tab1, tab2 = st.tabs(["Connection Management", "Component Parameters"])
 
     with tab1:
-        st.subheader("새 연결 추가")
-        src = st.selectbox("출발 (From)", REFRIG_COMP_LIST, key="sel_src")
-        trg = st.selectbox("도착 (To)",   REFRIG_COMP_LIST, key="sel_trg")
+        st.subheader("Add new connection")
+        src = st.selectbox("From (source component)", REFRIG_COMP_LIST, key="sel_src")
+        trg = st.selectbox("To (target component)",   REFRIG_COMP_LIST, key="sel_trg")
 
         c1, c2 = st.columns(2)
-        s_port = c1.selectbox("출구 포트", ["out1", "out2"], key="src_p")
-        t_port = c2.selectbox("입구 포트", ["in1", "in2"],  key="trg_p")
+        s_port = c1.selectbox("Source port", ["out1", "out2"], key="src_p")
+        t_port = c2.selectbox("Target port", ["in1", "in2"],  key="trg_p")
 
-        if st.button("연결 추가 (+)", use_container_width=True):
+        if st.button("Add connection (+)", use_container_width=True):
             st.session_state.connections.append({
                 "source": src, "target": trg,
                 "s_port": s_port, "t_port": t_port
             })
 
-        # 표준 냉동 사이클 자동 구성 버튼
-        if st.button("🔄 표준 냉동 사이클 자동 구성", use_container_width=True):
+        # Auto-build standard refrigeration cycle
+        if st.button("Build standard refrigeration cycle", use_container_width=True):
             st.session_state.connections = [
                 {"source": "CycleCloser", "target": "Compressor", "s_port": "out1", "t_port": "in1"},
                 {"source": "Compressor",  "target": "Condenser",  "s_port": "out1", "t_port": "in1"},
@@ -120,81 +134,100 @@ with st.sidebar:
             ]
             st.rerun()
 
-        if st.button("초기화 (Reset All)", type="primary", use_container_width=True):
+        if st.button("Reset all", type="primary", use_container_width=True):
             st.session_state.connections = []
             st.rerun()
 
-        # 현재 연결 목록 표시
+        # Show current connection list
         if st.session_state.connections:
-            st.subheader("현재 연결 목록")
+            st.subheader("Current connections")
             for i, c in enumerate(st.session_state.connections):
                 cols = st.columns([4, 1])
-                cols[0].caption(f"{i+1}. {c['source']}({c['s_port']}) → {c['target']}({c['t_port']})")
-                if cols[1].button("❌", key=f"del_{i}"):
+                cols[0].caption(
+                    f"{i+1}. {c['source']}({c['s_port']}) → "
+                    f"{c['target']}({c['t_port']})"
+                )
+                if cols[1].button("Delete", key=f"del_{i}"):
                     st.session_state.connections.pop(i)
                     st.rerun()
 
     with tab2:
-        st.subheader("컴포넌트 스펙")
+        st.subheader("Component specifications")
         active_comps = list(dict.fromkeys(
             [c['source'] for c in st.session_state.connections] +
             [c['target'] for c in st.session_state.connections]
         ))
 
         if not active_comps:
-            st.info("연결을 먼저 만드세요.")
+            st.info("Please create at least one connection first.")
         else:
-            selected = st.selectbox("수정할 부품", active_comps)
+            selected = st.selectbox("Component to edit", active_comps)
             params = st.session_state.comp_params.get(selected, {})
 
             if selected == "Compressor":
                 params['eta_s'] = st.slider(
-                    "등엔트로피 효율 (η_s)", 0.1, 1.0,
-                    float(params.get('eta_s', 0.8)), step=0.01
+                    "Isentropic efficiency (η_s)",
+                    0.1, 1.0,
+                    float(params.get('eta_s', 0.8)),
+                    step=0.01
                 )
 
             elif selected == "Condenser":
-                params['pr']    = st.slider(
-                    "압력비 (pr)", 0.5, 1.0, float(params.get('pr', 0.99)), step=0.01
+                params['pr'] = st.slider(
+                    "Pressure ratio (pr)",
+                    0.5, 1.0,
+                    float(params.get('pr', 0.99)),
+                    step=0.01
                 )
                 params['T_out'] = st.number_input(
-                    "응축 출구 온도 (°C)", value=float(params.get('T_out', 40.0))
+                    "Condenser outlet temperature (°C)",
+                    value=float(params.get('T_out', 40.0))
                 )
                 params['x_out'] = st.number_input(
-                    "응축 출구 건도 (x, 0=포화액)", min_value=0.0, max_value=1.0,
-                    value=float(params.get('x_out', 0.0)), step=0.1
+                    "Condenser outlet vapor quality (x, 0 = saturated liquid)",
+                    min_value=0.0, max_value=1.0,
+                    value=float(params.get('x_out', 0.0)),
+                    step=0.1
                 )
 
             elif selected == "Evaporator":
-                params['pr']    = st.slider(
-                    "압력비 (pr)", 0.5, 1.0, float(params.get('pr', 0.99)), step=0.01
+                params['pr'] = st.slider(
+                    "Pressure ratio (pr)",
+                    0.5, 1.0,
+                    float(params.get('pr', 0.99)),
+                    step=0.01
                 )
                 params['T_out'] = st.number_input(
-                    "증발 출구 온도 (°C)", value=float(params.get('T_out', 5.0))
+                    "Evaporator outlet temperature (°C)",
+                    value=float(params.get('T_out', 5.0))
                 )
                 params['x_out'] = st.number_input(
-                    "증발 출구 건도 (x, 1=포화증기)", min_value=0.0, max_value=1.0,
-                    value=float(params.get('x_out', 1.0)), step=0.1
+                    "Evaporator outlet vapor quality (x, 1 = saturated vapor)",
+                    min_value=0.0, max_value=1.0,
+                    value=float(params.get('x_out', 1.0)),
+                    step=0.1
                 )
 
             elif selected == "Valve":
                 params['pr'] = st.slider(
-                    "압력비 (pr, 1.0=계산값 자동)", 0.01, 1.0,
-                    float(params.get('pr', 1.0)), step=0.01
+                    "Pressure ratio (pr, 1.0 = automatic from calculation)",
+                    0.01, 1.0,
+                    float(params.get('pr', 1.0)),
+                    step=0.01
                 )
 
             elif selected == "CycleCloser":
-                st.info("CycleCloser는 설정 파라미터가 없습니다.")
+                st.info("CycleCloser has no adjustable parameters.")
 
             st.session_state.comp_params[selected] = params
 
-# --- 4. 메인 화면: 시각화 및 해석 ---
+# --- 4. Main area: visualization and analysis ---
 col_graph, col_res = st.columns([1, 1])
 
 with col_graph:
-    st.subheader("🖼️ 시스템 다이어그램")
+    st.subheader("System Diagram")
 
-    # 컴포넌트 색상 정의
+    # Component colors
     node_colors = {
         "CycleCloser": "#cccccc",
         "Compressor":  "#ffcc80",
@@ -212,39 +245,47 @@ with col_graph:
                 color = node_colors.get(node, "#ffffff")
                 dot.node(node, node, style='filled', fillcolor=color, shape='box')
                 added_nodes.add(node)
-        dot.edge(c['source'], c['target'],
-                 label=f"{c['s_port']}→{c['t_port']}", fontsize='9')
+        dot.edge(
+            c['source'], c['target'],
+            label=f"{c['s_port']}→{c['t_port']}",
+            fontsize='9'
+        )
 
     st.graphviz_chart(dot)
-    # --- 예시 냉동 사이클 그림 ---
-    st.caption("아래는 컴포넌트를 배치할 때 참고할 수 있는 기본 증기 압축 냉동 사이클 예시입니다.")
+
+    # Example refrigeration cycle diagram
+    st.caption(
+        "The following is an example of a basic vapor compression "
+        "refrigeration cycle that you can use as a reference when "
+        "building your system."
+    )
     draw_example_refrigeration_cycle()
-    
-    # 냉동 사이클 P-h 다이어그램 안내
+
+    # Standard refrigeration cycle info
     st.info(
-        "**표준 냉동 사이클 구성:**\n"
+        "**Standard refrigeration cycle configuration:**\n"
         "CycleCloser → Compressor → Condenser → Valve → Evaporator → CycleCloser\n\n"
-        "'🔄 표준 냉동 사이클 자동 구성' 버튼으로 빠르게 연결하세요."
+        "Use the 'Build standard refrigeration cycle' button to quickly create the connections."
     )
 
 with col_res:
-    st.subheader("🚀 시뮬레이션 결과")
+    st.subheader("Simulation Results")
 
-    # 사용자 정의 냉동 사이클 해석
-    if st.button("❄️ 해석 실행 (Solve)", use_container_width=True):
+    # Run user-defined refrigeration cycle analysis
+    if st.button("Run simulation (Solve)", use_container_width=True):
         if not st.session_state.connections:
-            st.warning("⚠️ 연결이 없습니다. 먼저 연결을 추가하세요.")
+            st.warning("No connections found. Please add at least one connection.")
         else:
             try:
                 fluid = st.session_state.fluid
 
-                # 네트워크 정의
+                # Define TESPy network
                 nw = Network(
                     fluids=[fluid],
                     T_unit='C', p_unit='bar', h_unit='kJ / kg', m_unit='kg / s'
                 )
 
-                # 컴포넌트 객체화
+                # Create component objects
                 comps = {}
                 unique_names = list(dict.fromkeys(
                     [c['source'] for c in st.session_state.connections] +
@@ -262,7 +303,7 @@ with col_res:
                     elif name == "Valve":
                         comps[name] = Valve(name)
 
-                # 컴포넌트 파라미터 할당
+                # Assign component parameters
                 params_all = st.session_state.comp_params
                 for name, obj in comps.items():
                     p = params_all.get(name, {})
@@ -271,14 +312,14 @@ with col_res:
                     elif isinstance(obj, Evaporator):
                         obj.set_attr(pr=p.get('pr', 0.99))
                     elif isinstance(obj, Valve):
-                        # Valve의 pr은 자동 계산 (DOF 처리)
+                        # pr for Valve is treated as DOF and can be solved by TESPy
                         pass
                     elif isinstance(obj, Condenser):
                         obj.set_attr(pr=p.get('pr', 0.99))
 
-                # 연결 생성
+                # Create connections
                 tespy_conns = []
-                conn_map   = {}  # 이름 → Connection 객체
+                conn_map = {}  # name -> Connection object
 
                 for conn in st.session_state.connections:
                     c = Connection(
@@ -291,14 +332,14 @@ with col_res:
 
                 nw.add_conns(*tespy_conns)
 
-                # --- 경계 조건 설정 (DOF 맞추기) ---
+                # --- Boundary conditions (DOF) ---
                 m = st.session_state.mass_flow
 
-                # CycleCloser → Compressor: 유체, 유량, 증발기 출구 조건 지정
                 key_ev_out = "Evaporator__CycleCloser"
                 key_cd_out = "Condenser__Valve"
                 key_cc_out = "CycleCloser__Compressor"
 
+                # CycleCloser → Compressor: fluid, mass flow, evap outlet conditions
                 if key_cc_out in conn_map:
                     p_ev = params_all.get("Evaporator", {})
                     conn_map[key_cc_out].set_attr(
@@ -308,7 +349,7 @@ with col_res:
                         x=p_ev.get('x_out', 1.0)
                     )
 
-                # Condenser → Valve: 응축기 출구 온도 & 건도 지정
+                # Condenser → Valve: condenser outlet temperature & quality
                 if key_cd_out in conn_map:
                     p_cd = params_all.get("Condenser", {})
                     conn_map[key_cd_out].set_attr(
@@ -316,47 +357,50 @@ with col_res:
                         x=p_cd.get('x_out', 0.0)
                     )
 
-                # 시뮬레이션 실행
+                # Solve network
                 nw.solve(mode='design')
                 nw.print_results()
 
-                st.success("✅ 시뮬레이션 성공!")
+                st.success("Simulation finished successfully.")
 
-                # 결과 테이블
+                # Result table
                 result_df = nw.results['Connection'][['m', 'p', 'T', 'h', 'x']]
                 st.dataframe(result_df.style.format("{:.4f}"), use_container_width=True)
 
-                # --- 성능 지표 계산 (COP) ---
-                st.subheader("📊 냉동 사이클 성능 지표")
+                # --- Performance indices (COP) ---
+                st.subheader("Performance indicators of the refrigeration cycle")
 
                 comp_obj = comps.get("Compressor")
                 evap_obj = comps.get("Evaporator")
 
                 if comp_obj is not None and evap_obj is not None:
                     try:
-                        # NOTE: TESPy 결과 구조에 따라 이 부분은 조정이 필요할 수 있음
+                        # NOTE: Depending on TESPy result structure, this part may need adjustment.
                         W_comp = abs(nw.results['Component'].loc['Compressor', 'P'])  # W
                         Q_evap = abs(nw.results['Component'].loc['Evaporator', 'Q'])  # W
 
                         COP = Q_evap / W_comp if W_comp > 0 else float('nan')
 
                         kpi_col1, kpi_col2, kpi_col3 = st.columns(3)
-                        kpi_col1.metric("압축기 소비 동력 (kW)", f"{W_comp/1000:.3f}")
-                        kpi_col2.metric("냉동 능력 Q_evap (kW)", f"{Q_evap/1000:.3f}")
-                        kpi_col3.metric("냉동 COP", f"{COP:.3f}")
+                        kpi_col1.metric("Compressor power (kW)", f"{W_comp/1000:.3f}")
+                        kpi_col2.metric("Cooling capacity Q_evap (kW)", f"{Q_evap/1000:.3f}")
+                        kpi_col3.metric("Refrigeration COP", f"{COP:.3f}")
                     except Exception as kpi_err:
-                        st.warning(f"성능 지표 계산 중 오류: {kpi_err}")
+                        st.warning(f"Error while calculating performance indicators: {kpi_err}")
                 else:
-                    st.info("Compressor 또는 Evaporator가 네트워크에 없습니다.")
+                    st.info("Compressor or Evaporator is not present in the network.")
 
             except Exception as e:
-                st.error(f"❌ 해석 실패: {e}")
-                st.markdown("""
-                **문제를 해결하려면?**
-                - **표준 사이클 구성 확인**: `🔄 표준 냉동 사이클 자동 구성` 버튼으로 연결을 초기화하세요.
-                - **CycleCloser 필수**: 냉동 사이클은 반드시 `CycleCloser`로 루프를 닫아야 합니다.
-                - **경계 조건**: 증발기 출구(T, x)와 응축기 출구(T, x) 값이 유효한지 확인하세요.
-                - **냉매 범위**: 설정한 온도가 선택 냉매의 동작 범위 내에 있는지 확인하세요.
-                """)
-
-    
+                st.error(f"Simulation failed: {e}")
+                st.markdown(
+                    """
+                    **How to debug the problem:**
+                    - **Check standard cycle configuration**: use the
+                      'Build standard refrigeration cycle' button to reset connections.
+                    - **CycleCloser required**: the cycle must be closed with `CycleCloser`.
+                    - **Boundary conditions**: check if the evaporator outlet (T, x) and
+                      condenser outlet (T, x) are valid values.
+                    - **Working fluid range**: make sure the temperatures are within the
+                      valid range for the selected working fluid.
+                    """
+                )
