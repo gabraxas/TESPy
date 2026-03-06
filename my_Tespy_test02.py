@@ -210,7 +210,10 @@ with col_graph:
                  label=f"{c['s_port']}→{c['t_port']}", fontsize='9')
 
     st.graphviz_chart(dot)
-
+    # --- (새로 추가) 예시 냉동 사이클 그림 ---
+    st.caption("아래는 컴포넌트를 배치할 때 참고할 수 있는 기본 증기 압축 냉동 사이클 예시입니다.")
+    draw_example_refrigeration_cycle()
+    
     # 냉동 사이클 P-h 다이어그램 안내
     st.info(
         "**표준 냉동 사이클 구성:**\n"
