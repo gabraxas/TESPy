@@ -1,0 +1,46 @@
+import steamlit as st
+from tespy.networks import Network
+from tespy.components import (Source, Sink, Compressor, Condenser, ExpansionValve, Evaporator)
+from tespy.connections import Connection
+from tespy.tools import ExergyAnalysis
+import pandas as pd
+
+def run_simulation(evap_temp, cond_temp, eta_s):
+# 1. 네트워크 및 컴포넌트 설정 (기존 refrigeration.py 로직)
+    nw = Network(fluids=['R134a'], T_unit='C', p_unit='bar', h_unit='kJ/kg')
+    
+    # 컴포넌트 정의...
+    # 커넥션 정의 및 파라미터 설정 (매개변수 반영)
+    # nw.solve(mode='design')
+    
+    # 2. 엑서지 분석 수행
+    # ean = ExergyAnalysis(...)
+    # ean.analyse(...)
+    
+    return nw, ean
+
+st.title("Refrigeration Cycle Exergy Analysis")
+
+with st.sidebar:
+    st.header("입력 파라미터")
+    evap_T = st.slider("증발 온도 (°C)", -20, 10, -5)
+    cond_T = st.slider("응축 온도 (°C)", 20, 50, 35)
+    comp_eta = st.sidebar.number_input("압축기 효율", 0.1, 1.0, 0.8)
+    
+    run_btn = st.button("시뮬레이션 실행")
+
+if run_btn:
+    nw, ean = run_simulation(evap_T, cond_T, comp_eta)
+    
+    # 결과 요약
+    st.subheader("시스템 성능 지표")
+    col1, col2 = st.columns(2)
+    col1.metric("COP", round(nw.busses['heat input'].P.val / nw.busses['power input'].P.val, 2))
+    col2.metric("Exergy Efficiency", f"{round(ean.epsilon * 100, 2)} %")
+
+    # 상세 데이터 테이블
+    st.subheader("Connection Results")
+    st.dataframe(nw.results['Connection'])
+    
+    # 엑서지 손실 차트 (Pie chart 예시)
+    # ean.results['components'] 데이터를 가공하여 st.plotly_chart 등으로 시각화
